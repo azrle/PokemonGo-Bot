@@ -5,7 +5,7 @@ from math import ceil
 from random import random, randint
 
 
-def sleep(seconds, delta=0.3):
+def sleep(seconds, delta=0.4):
     jitter = ceil(delta * seconds)
     sleep_time = randint(int(seconds - jitter), int(seconds + jitter))
     time.sleep(sleep_time)
