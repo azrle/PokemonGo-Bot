@@ -5,6 +5,7 @@ from sets import Set
 from utils import distance
 from pokemongo_bot.human_behaviour import sleep
 from pokemongo_bot import logger
+from random import random, randint
 
 class PokemonCatchWorker(object):
     BAG_FULL = 'bag_full'
@@ -55,8 +56,8 @@ class PokemonCatchWorker(object):
                                         continue
 
                                 pokemon_potential = round((total_IV / 45.0), 2)
-                                pokemon_num = int(pokemon['pokemon_data'][
-                                                  'pokemon_id']) - 1
+                                pokemon_id = int(pokemon['pokemon_data']['pokemon_id'])
+                                pokemon_num = pokemon_id - 1
                                 pokemon_name = self.pokemon_list[
                                     int(pokemon_num)]['Name']
                                 logger.log('[#] A Wild {} appeared! [CP {}] [Potential {}]'.format(
@@ -141,9 +142,8 @@ class PokemonCatchWorker(object):
                                         ), 'green'
                                     )
 
-                                    id_list2 = self.count_pokemon_inventory()
-
                                     if self.config.evolve_captured:
+                                        id_list2 = self.count_pokemon_inventory()
                                         pokemon_to_transfer = list(Set(id_list2) - Set(id_list1))
                                         self.api.evolve_pokemon(pokemon_id=pokemon_to_transfer[0])
                                         response_dict = self.api.call()
@@ -155,22 +155,20 @@ class PokemonCatchWorker(object):
                                             logger.log(
                                             '[x] Failed to evolve {}!'.format(pokemon_name))
 
-                                    if self.should_release_pokemon(pokemon_name, cp, pokemon_potential, response_dict):
+                                    sleep(2)
+                                    candidates = self.get_pokemons_by_name_sort_by_cp(pokemon_name)
+                                    if (len(candidates) > 1 and
+                                            self.should_release_pokemon(pokemon_name, cp, pokemon_potential, response_dict)):
                                         # Transfering Pokemon
-                                        pokemon_to_transfer = list(
-                                            Set(id_list2) - Set(id_list1))
-                                        if len(pokemon_to_transfer) == 0:
-                                            raise RuntimeError(
-                                                'Trying to transfer 0 pokemons!')
-                                        self.transfer_pokemon(
-                                            pokemon_to_transfer[0])
+                                        pokemon_to_transfer = candidates[0]
+                                        self.transfer_pokemon(pokemon_to_transfer[0])
                                         logger.log(
                                             '[#] {} has been exchanged for candy!'.format(pokemon_name), 'green')
                                     else:
                                         logger.log(
                                         '[x] Captured {}! [CP {}]'.format(pokemon_name, cp), 'green')
                             break
-        time.sleep(5)
+        sleep(5)
 
     def _transfer_low_cp_pokemon(self, value):
         self.api.get_inventory()
@@ -193,7 +191,7 @@ class PokemonCatchWorker(object):
                 else:
                     pokemon = item['inventory_item_data']['pokemon']
                     self._execute_pokemon_transfer(value, pokemon)
-                    time.sleep(1.2)
+                    time.sleep(1.2+random()*2)
 
     def _execute_pokemon_transfer(self, value, pokemon):
         if 'cp' in pokemon and pokemon['cp'] < value:
@@ -203,6 +201,34 @@ class PokemonCatchWorker(object):
     def transfer_pokemon(self, pid):
         self.api.release_pokemon(pokemon_id=pid)
         response_dict = self.api.call()
+
+    def get_pokemons_by_name_sort_by_cp(self, pokemon_name):
+        self.api.get_inventory()
+        response_dict = self.api.call()
+        pokemons = []
+        try:
+            reduce(dict.__getitem__, [
+                   "responses", "GET_INVENTORY", "inventory_delta", "inventory_items"], response_dict)
+        except KeyError:
+            pass
+        else:
+            for item in response_dict['responses']['GET_INVENTORY']['inventory_delta']['inventory_items']:
+                try:
+                    reduce(dict.__getitem__, [
+                           "inventory_item_data", "pokemon_data"], item)
+                except KeyError:
+                    pass
+                else:
+                    pokemon = item['inventory_item_data']['pokemon_data']
+                    if pokemon.get('is_egg', False):
+                        continue
+                    pokemon_num = int(pokemon['pokemon_id']) - 1
+                    hold_pokemon_name = self.bot.pokemon_list[int(pokemon_num)]['Name']
+                    if pokemon_name != hold_pokemon_name:
+                        continue
+                    pokemons.append([pokemon['id'], pokemon['cp']])
+        pokemons.sort(key=lambda x: x[1], reverse=False)
+        return pokemons
 
     def count_pokemon_inventory(self):
         self.api.get_inventory()
