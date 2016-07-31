@@ -11,6 +11,7 @@ import yaml
 import logger
 import re
 from pgoapi import PGoApi
+from pgoapi.exceptions import ServerBusyOrOfflineException
 from cell_workers import PokemonCatchWorker, SeenFortWorker, MoveToFortWorker, InitialTransferWorker, EvolveAllWorker
 from cell_workers.utils import distance
 from human_behaviour import sleep
@@ -397,32 +398,39 @@ class PokemonGoBot(object):
     def get_inventory_count(self, what):
         self.api.get_inventory()
         response_dict = self.api.call()
-        if 'responses' in response_dict:
-            if 'GET_INVENTORY' in response_dict['responses']:
-                if 'inventory_delta' in response_dict['responses'][
-                        'GET_INVENTORY']:
-                    if 'inventory_items' in response_dict['responses'][
-                            'GET_INVENTORY']['inventory_delta']:
-                        pokecount = 0
-                        itemcount = 1
-                        for item in response_dict['responses'][
-                                'GET_INVENTORY']['inventory_delta'][
-                                    'inventory_items']:
-                            #print('item {}'.format(item))
-                            if 'inventory_item_data' in item:
-                                if 'pokemon_data' in item[
-                                        'inventory_item_data']:
-                                    pokecount = pokecount + 1
-                                if 'item' in item['inventory_item_data']:
-                                    if 'count' in item['inventory_item_data'][
-                                            'item']:
-                                        itemcount = itemcount + \
-                                            item['inventory_item_data'][
-                                                'item']['count']
-        if 'pokemon' in what:
-            return pokecount
-        if 'item' in what:
-            return itemcount
+        try:
+            reduce(dict.__getitem__, [
+                   "responses", "GET_INVENTORY", "inventory_delta", "inventory_items"], response_dict)
+        except KeyError:
+            raise ServerBusyOrOfflineException()
+        else:
+            if 'responses' in response_dict:
+                if 'GET_INVENTORY' in response_dict['responses']:
+                    if 'inventory_delta' in response_dict['responses'][
+                            'GET_INVENTORY']:
+                        if 'inventory_items' in response_dict['responses'][
+                                'GET_INVENTORY']['inventory_delta']:
+                            pokecount = 0
+                            itemcount = 1
+                            for item in response_dict['responses'][
+                                    'GET_INVENTORY']['inventory_delta'][
+                                        'inventory_items']:
+                                #print('item {}'.format(item))
+                                if 'inventory_item_data' in item:
+                                    if 'pokemon_data' in item[
+                                            'inventory_item_data']:
+                                        pokecount = pokecount + 1
+                                    if 'item' in item['inventory_item_data']:
+                                        if 'count' in item['inventory_item_data'][
+                                                'item']:
+                                            itemcount = itemcount + \
+                                                item['inventory_item_data'][
+                                                    'item']['count']
+
+            if 'pokemon' in what:
+                return pokecount
+            if 'item' in what:
+                return itemcount
         return '0'
 
     def get_player_info(self):

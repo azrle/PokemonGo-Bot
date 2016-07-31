@@ -34,6 +34,8 @@ import ssl
 import sys
 import codecs
 from getpass import getpass
+from pgoapi.exceptions import NotLoggedInException, ServerBusyOrOfflineException
+from geopy.exc import GeocoderQuotaExceeded
 import logging
 import requests
 from pokemongo_bot import logger
@@ -201,20 +203,34 @@ def main():
     logger.log('[x] PokemonGO Bot v1.0', 'green')
     logger.log('[x] Configuration initialized', 'yellow')
 
-    try:
-        bot = PokemonGoBot(config)
-        bot.start()
+    finished = False
 
-        logger.log('[x] Starting PokemonGo Bot....', 'green')
+    while not finished:
+        try:
+            bot = PokemonGoBot(config)
+            bot.start()
 
-        while True:
-            bot.take_step()
+            logger.log('[x] Starting PokemonGo Bot....', 'green')
 
-    except KeyboardInterrupt:
-        logger.log('[x] Exiting PokemonGo Bot', 'red')
-        # TODO Add number of pokemon catched, pokestops visited, highest CP
-        # pokemon catched, etc.
+            while True:
+                bot.take_step()
 
+        except KeyboardInterrupt:
+            logger.log('[x] Exiting PokemonGo Bot', 'red')
+            finished = True
+            # TODO Add number of pokemon catched, pokestops visited, highest CP
+            # pokemon catched, etc.
+        except NotLoggedInException:
+             logger.log('[x] Error while connecting to the server, please wait %s minutes' % config.reconnecting_timeout, 'red')
+             time.sleep(config.reconnecting_timeout * 60)
+        except ServerBusyOrOfflineException:
+             logger.log('[x] Server is busy, please wait 30 seconds', 'red')
+             time.sleep(30)
+        except GeocoderQuotaExceeded:
+            logger.log('[x] The given maps api key has gone over the requests limit.', 'red')
+            finished = True
+        except:
+            raise
 
 if __name__ == '__main__':
     main()
