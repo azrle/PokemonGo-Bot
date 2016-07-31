@@ -147,6 +147,13 @@ def init_config():
                         help="(Ad-hoc mode) Bot will attempt to evolve all the pokemons captured!",
                         type=bool,
                         default=False)
+    parser.add_argument(
+            "-rt",
+            "--reconnecting_timeout",
+            help="Timeout between reconnecting if error occured (in minutes, e.g. 15)",
+            type=float,
+            default=15.0
+            )
 
     config = parser.parse_args()
     if not config.username and 'username' not in load:
