@@ -149,42 +149,48 @@ class PokemonGoBot(object):
         currency_1 = "0"
         currency_2 = "0"
 
-        player = response_dict['responses']['GET_PLAYER']['player_data']
+        try:
+            reduce(dict.__getitem__, [
+                   "responses", "GET_PLAYER", "player_data"], response_dict)
+        except KeyError:
+            raise ServerBusyOrOfflineException()
+        else:
+            player = response_dict['responses']['GET_PLAYER']['player_data']
 
-        # @@@ TODO: Convert this to d/m/Y H:M:S
-        creation_date = datetime.datetime.fromtimestamp(
-            player['creation_timestamp_ms'] / 1e3)
+            # @@@ TODO: Convert this to d/m/Y H:M:S
+            creation_date = datetime.datetime.fromtimestamp(
+                player['creation_timestamp_ms'] / 1e3)
 
-        pokecoins = '0'
-        stardust = '0'
-        balls_stock = self.pokeball_inventory()
+            pokecoins = '0'
+            stardust = '0'
+            balls_stock = self.pokeball_inventory()
 
-        if 'amount' in player['currencies'][0]:
-            pokecoins = player['currencies'][0]['amount']
-        if 'amount' in player['currencies'][1]:
-            stardust = player['currencies'][1]['amount']
+            if 'amount' in player['currencies'][0]:
+                pokecoins = player['currencies'][0]['amount']
+            if 'amount' in player['currencies'][1]:
+                stardust = player['currencies'][1]['amount']
 
-        logger.log('[#] Username: {username}'.format(**player))
-        logger.log('[#] Acccount Creation: {}'.format(creation_date))
-        logger.log('[#] Bag Storage: {}/{}'.format(
-            self.get_inventory_count('item'), player['max_item_storage']))
-        logger.log('[#] Pokemon Storage: {}/{}'.format(
-            self.get_inventory_count('pokemon'), player[
-                'max_pokemon_storage']))
-        logger.log('[#] Stardust: {}'.format(stardust))
-        logger.log('[#] Pokecoins: {}'.format(pokecoins))
-        logger.log('[#] PokeBalls: ' + str(balls_stock[1]))
-        logger.log('[#] GreatBalls: ' + str(balls_stock[2]))
-        logger.log('[#] UltraBalls: ' + str(balls_stock[3]))
+            logger.log('[#] Username: {username}'.format(**player))
+            logger.log('[#] Acccount Creation: {}'.format(creation_date))
+            logger.log('[#] Bag Storage: {}/{}'.format(
+                self.get_inventory_count('item'), player['max_item_storage']))
+            logger.log('[#] Pokemon Storage: {}/{}'.format(
+                self.get_inventory_count('pokemon'), player[
+                    'max_pokemon_storage']))
+            logger.log('[#] Stardust: {}'.format(stardust))
+            logger.log('[#] Pokecoins: {}'.format(pokecoins))
+            logger.log('[#] PokeBalls: ' + str(balls_stock[1]))
+            logger.log('[#] GreatBalls: ' + str(balls_stock[2]))
+            logger.log('[#] UltraBalls: ' + str(balls_stock[3]))
 
-        self.get_player_info()
+            self.get_player_info()
 
-        if self.config.initial_transfer:
-            worker = InitialTransferWorker(self)
-            worker.work()
+            if self.config.initial_transfer:
+                worker = InitialTransferWorker(self)
+                worker.work()
 
-        logger.log('[#]')
-        self.update_inventory()
+            logger.log('[#]')
+            self.update_inventory()
 
     def catch_pokemon(self, pokemon):
         worker = PokemonCatchWorker(pokemon, self)
@@ -208,77 +214,95 @@ class PokemonGoBot(object):
         self.api.get_inventory()
         response = self.api.call()
         self.inventory = list()
-        if 'responses' in response:
-            if 'GET_INVENTORY' in response['responses']:
-                if 'inventory_delta' in response['responses']['GET_INVENTORY']:
-                    if 'inventory_items' in response['responses'][
-                            'GET_INVENTORY']['inventory_delta']:
-                        for item in response['responses']['GET_INVENTORY'][
-                                'inventory_delta']['inventory_items']:
-                            if not 'inventory_item_data' in item:
-                                continue
-                            if not 'item' in item['inventory_item_data']:
-                                continue
-                            if not 'item_id' in item['inventory_item_data'][
-                                    'item']:
-                                continue
-                            if not 'count' in item['inventory_item_data'][
-                                    'item']:
-                                continue
-                            self.inventory.append(item['inventory_item_data'][
-                                'item'])
+        try:
+            reduce(dict.__getitem__, [
+                   "responses", "GET_INVENTORY", "inventory_delta", "inventory_items"], response)
+        except KeyError:
+            raise ServerBusyOrOfflineException()
+        else:
+            if 'responses' in response:
+                if 'GET_INVENTORY' in response['responses']:
+                    if 'inventory_delta' in response['responses']['GET_INVENTORY']:
+                        if 'inventory_items' in response['responses'][
+                                'GET_INVENTORY']['inventory_delta']:
+                            for item in response['responses']['GET_INVENTORY'][
+                                    'inventory_delta']['inventory_items']:
+                                if not 'inventory_item_data' in item:
+                                    continue
+                                if not 'item' in item['inventory_item_data']:
+                                    continue
+                                if not 'item_id' in item['inventory_item_data'][
+                                        'item']:
+                                    continue
+                                if not 'count' in item['inventory_item_data'][
+                                        'item']:
+                                    continue
+                                self.inventory.append(item['inventory_item_data'][
+                                    'item'])
 
     def pokeball_inventory(self):
         self.api.get_player().get_inventory()
 
         inventory_req = self.api.call()
-        inventory_dict = inventory_req['responses']['GET_INVENTORY'][
-            'inventory_delta']['inventory_items']
+        try:
+            reduce(dict.__getitem__, [
+                   "responses", "GET_INVENTORY", "inventory_delta", "inventory_items"], inventory_req)
+        except KeyError:
+            raise ServerBusyOrOfflineException()
+        else:
+            inventory_dict = inventory_req['responses']['GET_INVENTORY'][
+                'inventory_delta']['inventory_items']
 
-        user_web_inventory = 'web/inventory-%s.json' % (self.config.username)
-        with open(user_web_inventory, 'w') as outfile:
-            json.dump(inventory_dict, outfile)
+            user_web_inventory = 'web/inventory-%s.json' % (self.config.username)
+            with open(user_web_inventory, 'w') as outfile:
+                json.dump(inventory_dict, outfile)
 
-        # get player balls stock
-        # ----------------------
-        balls_stock = {1: 0, 2: 0, 3: 0, 4: 0}
+            # get player balls stock
+            # ----------------------
+            balls_stock = {1: 0, 2: 0, 3: 0, 4: 0}
 
-        for item in inventory_dict:
-            try:
-                # print(item['inventory_item_data']['item'])
-                item_id = item['inventory_item_data']['item']['item_id']
-                item_count = item['inventory_item_data']['item']['count']
+            for item in inventory_dict:
+                try:
+                    # print(item['inventory_item_data']['item'])
+                    item_id = item['inventory_item_data']['item']['item_id']
+                    item_count = item['inventory_item_data']['item']['count']
 
-                if item_id == Item.ITEM_POKE_BALL.value:
-                    # print('Poke Ball count: ' + str(item_count))
-                    balls_stock[1] = item_count
-                if item_id == Item.ITEM_GREAT_BALL.value:
-                    # print('Great Ball count: ' + str(item_count))
-                    balls_stock[2] = item_count
-                if item_id == Item.ITEM_ULTRA_BALL.value:
-                    # print('Ultra Ball count: ' + str(item_count))
-                    balls_stock[3] = item_count
-            except:
-                continue
-        return balls_stock
+                    if item_id == Item.ITEM_POKE_BALL.value:
+                        # print('Poke Ball count: ' + str(item_count))
+                        balls_stock[1] = item_count
+                    if item_id == Item.ITEM_GREAT_BALL.value:
+                        # print('Great Ball count: ' + str(item_count))
+                        balls_stock[2] = item_count
+                    if item_id == Item.ITEM_ULTRA_BALL.value:
+                        # print('Ultra Ball count: ' + str(item_count))
+                        balls_stock[3] = item_count
+                except:
+                    continue
+            return balls_stock
 
     def item_inventory_count(self, id):
         self.api.get_player().get_inventory()
 
         inventory_req = self.api.call()
-        inventory_dict = inventory_req['responses'][
-            'GET_INVENTORY']['inventory_delta']['inventory_items']
+        try:
+            reduce(dict.__getitem__, [
+                   "responses", "GET_INVENTORY", "inventory_delta", "inventory_items"], inventory_req)
+        except KeyError:
+            raise ServerBusyOrOfflineException()
+        else:
+            inventory_dict = inventory_req['responses'][
+                'GET_INVENTORY']['inventory_delta']['inventory_items']
 
-        item_count = 0
+            item_count = 0
 
-        for item in inventory_dict:
-            try:
-                if item['inventory_item_data']['item']['item_id'] == int(id):
-                    item_count = item[
-                        'inventory_item_data']['item']['count']
-            except:
-                continue
-        return item_count
+            for item in inventory_dict:
+                try:
+                    if item['inventory_item_data']['item']['item_id'] == int(id):
+                        item_count = item[
+                            'inventory_item_data']['item']['count']
+                except:
+                    continue
+            return item_count
 
     def _set_starting_position(self):
 
@@ -436,47 +460,53 @@ class PokemonGoBot(object):
     def get_player_info(self):
         self.api.get_inventory()
         response_dict = self.api.call()
-        if 'responses' in response_dict:
-            if 'GET_INVENTORY' in response_dict['responses']:
-                if 'inventory_delta' in response_dict['responses'][
-                        'GET_INVENTORY']:
-                    if 'inventory_items' in response_dict['responses'][
-                            'GET_INVENTORY']['inventory_delta']:
-                        pokecount = 0
-                        itemcount = 1
-                        for item in response_dict['responses'][
-                                'GET_INVENTORY']['inventory_delta'][
-                                    'inventory_items']:
-                            #print('item {}'.format(item))
-                            if 'inventory_item_data' in item:
-                                if 'player_stats' in item[
-                                        'inventory_item_data']:
-                                    playerdata = item['inventory_item_data'][
-                                        'player_stats']
+        try:
+            reduce(dict.__getitem__, [
+                   "responses", "GET_INVENTORY", "inventory_delta", "inventory_items"], response_dict)
+        except KeyError:
+            raise ServerBusyOrOfflineException()
+        else:
+            if 'responses' in response_dict:
+                if 'GET_INVENTORY' in response_dict['responses']:
+                    if 'inventory_delta' in response_dict['responses'][
+                            'GET_INVENTORY']:
+                        if 'inventory_items' in response_dict['responses'][
+                                'GET_INVENTORY']['inventory_delta']:
+                            pokecount = 0
+                            itemcount = 1
+                            for item in response_dict['responses'][
+                                    'GET_INVENTORY']['inventory_delta'][
+                                        'inventory_items']:
+                                #print('item {}'.format(item))
+                                if 'inventory_item_data' in item:
+                                    if 'player_stats' in item[
+                                            'inventory_item_data']:
+                                        playerdata = item['inventory_item_data'][
+                                            'player_stats']
 
-                                    nextlvlxp = (
-                                        int(playerdata.get('next_level_xp', 0)) -
-                                        int(playerdata.get('experience', 0)))
+                                        nextlvlxp = (
+                                            int(playerdata.get('next_level_xp', 0)) -
+                                            int(playerdata.get('experience', 0)))
 
-                                    if 'level' in playerdata:
-                                        logger.log(
-                                            '[#] -- Level: {level}'.format(
-                                                **playerdata))
+                                        if 'level' in playerdata:
+                                            logger.log(
+                                                '[#] -- Level: {level}'.format(
+                                                    **playerdata))
 
-                                    if 'experience' in playerdata:
-                                        logger.log(
-                                            '[#] -- Experience: {experience}'.format(
-                                                **playerdata))
-                                        logger.log(
-                                            '[#] -- Experience until next level: {}'.format(
-                                                nextlvlxp))
+                                        if 'experience' in playerdata:
+                                            logger.log(
+                                                '[#] -- Experience: {experience}'.format(
+                                                    **playerdata))
+                                            logger.log(
+                                                '[#] -- Experience until next level: {}'.format(
+                                                    nextlvlxp))
 
-                                    if 'pokemons_captured' in playerdata:
-                                        logger.log(
-                                            '[#] -- Pokemon Captured: {pokemons_captured}'.format(
-                                                **playerdata))
+                                        if 'pokemons_captured' in playerdata:
+                                            logger.log(
+                                                '[#] -- Pokemon Captured: {pokemons_captured}'.format(
+                                                    **playerdata))
 
-                                    if 'poke_stop_visits' in playerdata:
-                                        logger.log(
-                                            '[#] -- Pokestops Visited: {poke_stop_visits}'.format(
-                                                **playerdata))
+                                        if 'poke_stop_visits' in playerdata:
+                                            logger.log(
+                                                '[#] -- Pokestops Visited: {poke_stop_visits}'.format(
+                                                    **playerdata))
