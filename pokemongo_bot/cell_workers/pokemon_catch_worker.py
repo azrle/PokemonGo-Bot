@@ -74,13 +74,18 @@ class PokemonCatchWorker(object):
 
                         balls_stock = self.bot.pokeball_inventory()
                         while(True):
+                            if pokemon_name in self.config.weak_pokemon:
+                                logger.log(
+                                    '[#] The pokemon is weak; carefully choose the ball...', 'yellow')
 
                             pokeball = 1 # default:poke ball
 
                             if balls_stock[1] <= 0: # if poke ball are out of stock
                                 if balls_stock[2] > 0: # and player has great balls in stock...
                                     pokeball = 2 # then use great balls
-                                elif balls_stock[3] > 0: # or if great balls are out of stock too, and player has ultra balls...
+                                elif balls_stock[3] > 0 and not (pokemon_name in self.config.weak_pokemon):
+                                    # or if great balls are out of stock too, and player has ultra balls...
+                                    # however do not waste ultra balls on the waek pokemon
                                     pokeball = 3 # then use ultra balls
                                 else:
                                     pokeball = 0 # player doesn't have any of pokeballs, great balls or ultra balls
@@ -88,6 +93,9 @@ class PokemonCatchWorker(object):
                             while(pokeball < 3):
                                 if catch_rate[pokeball-1] < 0.35 and balls_stock[pokeball+1] > 0:
                                     # if current ball chance to catch is under 35%, and player has better ball - then use it
+                                    if pokemon_name in self.config.weak_pokemon:
+                                        # do not upgrade ball for the weak pokemon
+                                        break
                                     pokeball = pokeball+1 # use better ball
                                 else:
                                     break

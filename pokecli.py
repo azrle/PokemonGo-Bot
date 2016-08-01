@@ -147,6 +147,7 @@ def init_config():
                         help="(Ad-hoc mode) Bot will attempt to evolve all the pokemons captured!",
                         type=bool,
                         default=False)
+
     parser.add_argument(
             "-rt",
             "--reconnecting_timeout",
@@ -154,6 +155,12 @@ def init_config():
             type=float,
             default=15.0
             )
+
+    parser.add_argument("-wp",
+                        "--weak_pokemon",
+                        help="Do NOT use ultra balls to catch pokemons in the list.",
+                        type=str,
+                        default=[])
 
     config = parser.parse_args()
     if not config.username and 'username' not in load:
@@ -191,6 +198,9 @@ def init_config():
 
     if config.evolve_all:
         config.evolve_all = [str(pokemon_name) for pokemon_name in config.evolve_all.split(',')]
+
+    if config.weak_pokemon:
+        config.weak_pokemon = [str(pokemon_name) for pokemon_name in config.weak_pokemon.split(',')]
 
     return config
 
