@@ -6,6 +6,7 @@ import json
 import random
 import threading
 import datetime
+import time
 import sys
 import yaml
 import logger
@@ -20,12 +21,13 @@ from geopy.geocoders import GoogleV3
 from math import radians, sqrt, sin, cos, atan2
 from item_list import Item
 
-
 class PokemonGoBot(object):
     def __init__(self, config):
         self.config = config
         self.pokemon_list = json.load(open('data/pokemon.json'))
         self.item_list = json.load(open('data/items.json'))
+        self.forts_cache = {}
+        self.forts_cache_max = 500
 
     def start(self):
         self._setup_logging()
@@ -85,11 +87,40 @@ class PokemonGoBot(object):
                          if 'latitude' in fort and 'type' in fort]
                 gyms = [gym for gym in cell['forts'] if 'gym_points' in gym]
 
+                for fort in forts:
+                    if (fort['id'] in self.forts_cache and
+                            'next_visit_after_ts' in self.forts_cache[fort['id']] and
+                            self.forts_cache[fort['id']]['next_visit_after_ts'] > time.time()):
+                        continue
+                    self.forts_cache[fort['id']] = fort
+                sorted_forts = sorted(self.forts_cache.items(), key=lambda x: distance(self.position[
+                           0], self.position[1], x[1]['latitude'], x[1]['longitude']))
+                if len(self.forts_cache) > self.forts_cache_max:
+                    # evict cache
+                    for (fortId, fort) in sorted_forts[self.forts_cache_max/3*2:]:
+                        del self.forts_cache[fortId]
+
                 # Sort all by distance from current pos- eventually this should
                 # build graph & A* it
-                forts.sort(key=lambda x: distance(self.position[
-                           0], self.position[1], x['latitude'], x['longitude']))
-                for fort in forts:
+                # forts.sort(key=lambda x: distance(self.position[
+                #            0], self.position[1], x['latitude'], x['longitude']))
+                loop_count = 0
+                while loop_count < len(forts):
+                    fortId = -1
+                    fort = {}
+                    for (k, v) in sorted_forts:
+                        if ('next_visit_after_ts' not in v or
+                                v['next_visit_after_ts'] < time.time()):
+                            fortId = k
+                            fort = v
+                            break
+                    if 'id' not in fort:
+                        break
+                    logger.log('[#] Next fort: {} (internal loop {})'.format(fort['id'], loop_count))
+                    loop_count += 1
+
+                    # make sure we mark it visited
+                    fort['next_visit_after_ts'] = time.time() + random.randint(5, 20)*60
                     worker = MoveToFortWorker(fort, self)
                     worker.work()
 
@@ -98,6 +129,8 @@ class PokemonGoBot(object):
                     if hack_chain > 10:
                         #print('need a rest')
                         break
+                    sorted_forts = sorted(self.forts_cache.items(), key=lambda x: distance(fort['latitude'],
+                        fort['longitude'], x[1]['latitude'], x[1]['longitude']))
 
     def _setup_logging(self):
         self.log = logging.getLogger(__name__)
