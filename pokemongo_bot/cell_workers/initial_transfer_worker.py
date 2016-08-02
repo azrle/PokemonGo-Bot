@@ -61,6 +61,9 @@ class InitialTransferWorker(object):
             except KeyError:
                 continue
 
+            if pokemon['inventory_item_data']['pokemon_data'].get('favorite', 0) is 1:
+                continue
+
             group_id = pokemon['inventory_item_data'][
                 'pokemon_data']['pokemon_id']
             group_pokemon = pokemon['inventory_item_data'][

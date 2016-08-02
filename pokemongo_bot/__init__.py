@@ -106,8 +106,7 @@ class PokemonGoBot(object):
                 #            0], self.position[1], x['latitude'], x['longitude']))
                 loop_count = 0
                 while loop_count < len(forts):
-                    fortId = -1
-                    fort = {}
+                    fortId, fort = sorted_forts[random.randint(0, len(sorted_forts)-1)]
                     for (k, v) in sorted_forts:
                         if ('next_visit_after_ts' not in v or
                                 v['next_visit_after_ts'] < time.time()):
@@ -120,7 +119,7 @@ class PokemonGoBot(object):
                     loop_count += 1
 
                     # make sure we mark it visited
-                    fort['next_visit_after_ts'] = time.time() + random.randint(5, 20)*60
+                    fort['next_visit_after_ts'] = time.time() + random.randint(10, 20)*60
                     worker = MoveToFortWorker(fort, self)
                     worker.work()
 
@@ -290,6 +289,7 @@ class PokemonGoBot(object):
             with open(user_web_inventory, 'w') as outfile:
                 json.dump(inventory_dict, outfile)
 
+            total_count = 0
             # get player balls stock
             # ----------------------
             balls_stock = {1: 0, 2: 0, 3: 0, 4: 0}
@@ -299,6 +299,7 @@ class PokemonGoBot(object):
                     # print(item['inventory_item_data']['item'])
                     item_id = item['inventory_item_data']['item']['item_id']
                     item_count = item['inventory_item_data']['item']['count']
+                    total_count += item_count
 
                     if item_id == Item.ITEM_POKE_BALL.value:
                         # print('Poke Ball count: ' + str(item_count))
@@ -311,6 +312,12 @@ class PokemonGoBot(object):
                         balls_stock[3] = item_count
                 except:
                     continue
+
+            if self.config.mode == "poke" and total_count < 300:
+                logger.log(
+                    '[#] Switch to farming mode to spin more...', 'yellow')
+                self.config.mode = "all"
+
             return balls_stock
 
     def item_inventory_count(self, id):

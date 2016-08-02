@@ -162,6 +162,12 @@ def init_config():
                         type=str,
                         default=[])
 
+    parser.add_argument("-sps",
+                        "--start_points",
+                        help="List of start points",
+                        type=str,
+                        default=[])
+
     config = parser.parse_args()
     if not config.username and 'username' not in load:
         config.username = raw_input("Username: ")
@@ -202,6 +208,9 @@ def init_config():
     if config.weak_pokemon:
         config.weak_pokemon = [str(pokemon_name) for pokemon_name in config.weak_pokemon.split(',')]
 
+    if config.start_points:
+        config.start_points = [points.split(',') for points in config.weak_pokemon.split(';')]
+
     return config
 
 
@@ -222,6 +231,7 @@ def main():
 
     finished = False
 
+    loop = 0
     while not finished:
         try:
             bot = PokemonGoBot(config)
@@ -240,6 +250,15 @@ def main():
         except NotLoggedInException:
              logger.log('[x] Error while connecting to the server, please wait %s minutes' % config.reconnecting_timeout, 'red')
              time.sleep(config.reconnecting_timeout * 60)
+             if len(config.start_points) > 0:
+                 pos = config.start_points[loop]
+                 loop = (loop + 1) % len(config.start_points)
+
+                 if os.path.isfile(user_data_lastlocation):
+                     with open(user_data_lastlocation, 'w') as outfile:
+                         outfile.truncate()
+                         json.dump({'lat': pos[0], 'lng': pos[1]}, outfile)
+                         logger.log('[#] Change start position to ({}, {})'.format(pos[0], pos[1]), 'yellow')
         except ServerBusyOrOfflineException:
              logger.log('[x] Server is busy, please wait 30 seconds', 'red')
              time.sleep(30)
