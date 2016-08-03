@@ -209,7 +209,7 @@ def init_config():
         config.weak_pokemon = [str(pokemon_name) for pokemon_name in config.weak_pokemon.split(',')]
 
     if config.start_points:
-        config.start_points = [points.split(',') for points in config.weak_pokemon.split(';')]
+        config.start_points = [points.split(',') for points in config.start_points.split(';')]
 
     return config
 
@@ -232,6 +232,7 @@ def main():
     finished = False
 
     loop = 0
+    user_data_lastlocation = 'data/last-location-%s.json' % (config.username)
     while not finished:
         try:
             bot = PokemonGoBot(config)
